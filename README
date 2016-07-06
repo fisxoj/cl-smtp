@@ -35,7 +35,7 @@ Returns nil or error with message
   - cc (String or List of Strings) : email adress carbon copy
   - bcc (String or List of Strings): email adress blind carbon copy
   - reply-to (String)              : email adress
-  - displayname (String)           : displayname of the sender
+  - display-name (String)          : displayname of the sender
   - extra-headers (List)           : extra headers as alist
   - html-message (String)          : message body formatted with HTML tags
   - authentication (List)          : list with 2 or elements
