@@ -286,41 +286,65 @@
                                supported authentication scheme.  Features announced: ~{~S~^, ~}"
                        (features condition))))))
 
+(define-condition authentication-method-unsupported (no-supported-authentication-method)
+  ((selected-auth-method :initarg :selected-auth-method :reader selected-auth-method))
+  (:report (lambda (condition stream)
+             (print-unreadable-object (condition stream :type t)
+               (format stream "SMTP authentication method ~S requested, but it was not supported by the server.  Features announced: ~{~S~^, ~}"
+                       (selected-auth-method condition)
+                       (features condition))))))
+
 (defun smtp-authenticate (stream authentication features)
   "Authenticate to the SMTP server connected on STREAM.
    AUTHENTICATION is a list of two or three elements.  If the first
    element is a keyword, it specifies the desired authentication
-   method (:PLAIN or :LOGIN), which is currently ignored.  The actual
-   method used is determined by looking at the advertised features of
-   the SMTP server.  The (other) two elements of the AUTHENTICATION
-   list are the login username and password.  FEATURES is the list of
-   features announced by the SMTP server.
+   method (:PLAIN, :LOGIN, or :OAUTH2).  The (other) two elements of
+   the AUTHENTICATION list are the login username and password.
+   FEATURES is the list of features announced by the SMTP server.
 
    If the server does not announce any compatible authentication scheme,
-   the NO-SUPPORTED-AUTHENTICATION-METHOD error is signalled."
-  (when (keywordp (car authentication))
-    (pop authentication))
+   the NO-SUPPORTED-AUTHENTICATION-METHOD error is signalled.
+
+   If the specified authentication scheme is not supported by the server
+   the AUTHENTICATION-METHOD-UNSUPPORTED error is signalled."
+
+  (unless (= (length authentication) 3)
+    ;; If no authentication method was specified, assume :PLAIN
+    (push :plain authentication))
+
   (let ((server-authentication (loop for i in features
                                   for e = (search "AUTH " i :test #'equal)
                                   when (and e (= e 0))
                                   return i)))
-    (destructuring-bind (username password) authentication
+
+    (destructuring-bind (auth-method username password) authentication
+      (unless (search (string-upcase auth-method) server-authentication :test #'equal)
+        (error 'authentication-method-unsupported :features features :selected-auth-method auth-method))
+
       (cond
-        ((search " PLAIN" server-authentication :test #'equal)
-         (smtp-command stream (format nil "AUTH PLAIN ~A" 
+        ((eq auth-method :plain)
+
+         (smtp-command stream (format nil "AUTH PLAIN ~A"
                                       (string-to-base64-string
-                                       (format nil "~A~C~A~C~A" 
+                                       (format nil "~A~C~A~C~A"
                                                username
                                                #\null username
                                                #\null password)
                                        :columns 0))
                        235))
-        ((search " LOGIN" server-authentication :test #'equal)
+        ((eq auth-method :login)
          (smtp-command stream "AUTH LOGIN"
                        334)
          (smtp-command stream (string-to-base64-string username :columns 0)
                        334)
          (smtp-command stream (string-to-base64-string password :columns 0)
+                       235))
+        ((eq auth-method :oauth2)
+         (smtp-command stream (format nil "AUTH XOAUTH2 ~A"
+                                      (string-to-base64-string
+                                       (format nil "user=~a~Cauth=Bearer ~a~C~C"
+                                               username #\Soh password #\Soh #\Soh)
+                                       :columns 0))
                        235))
         (t
          (error 'no-supported-authentication-method :features features))))))

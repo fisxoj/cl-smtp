@@ -40,16 +40,17 @@ Returns nil or error with message
   - html-message (String)          : message body formatted with HTML tags
   - authentication (List)          : list with 2 or elements
                                      ([:method] "username" "password")
-                                     method is a keyword :plain or :login
-                                     If the method is not specified, the
-                                     proper method is determined automatically.
+                                     method is a keyword :plain, :login, or :oauth2
+                                     If the method is not specified, plain is assumed.
+                                     If oauth2 is used, password is assumed to be an
+                                     oauth2 access token.
   - attachments (Attachment Instance or String or Pathname: attachments to send
                 List of Attachment/String/Pathnames)
   - buffer-size (Number default 256): is no longer used, will remove in the future
   - ssl (or t :starttls :tls)       : if t or :STARTTLS: use the STARTTLS functionality
                                       if :TLS: use TLS directly
   - external-format                 : symbol, default :utf-8
-  - envelope-sender                 : email adress, 
+  - envelope-sender                 : email adress,
                                       if not set then envelope-sender = from
 
 ------------------------------------------------
